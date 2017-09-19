@@ -233,8 +233,9 @@ function read(io::IO, ::Type{T}) where {T <: Integer}
     while NEG_ONE < b < TEN
         parseddigits = true
         b = readbyte(io)
-        v *= T(10)
-        v += T(b - ZERO)
+        v, ov_mul = Base.mul_with_overflow(v, T(10))
+        v, ov_add = Base.add_with_overflow(v, T(b - ZERO))
+        (ov_mul | ov_add) && throw(OverflowError("overflow parsing $T, parsed $v"))
         eof(io) && break
         b = peekbyte(io)
     end
