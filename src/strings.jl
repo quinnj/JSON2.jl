@@ -47,6 +47,7 @@ function escapechar(b)
     b == NEWLINE   && return LITTLE_N
     b == RETURN    && return LITTLE_R
     b == TAB       && return LITTLE_T
+    return 0x00
 end
 
 function reverseescapechar(b)
