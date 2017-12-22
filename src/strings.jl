@@ -77,6 +77,7 @@ function readhexchar(bytes, i)
     return Char(n), i
 end
 
+iscntrl(c::Char) = c <= '\x1f' || '\x7f' <= c <= '\u9f'
 function escaped(b)
     if b == FORWARDSLASH
         return [FORWARDSLASH]
@@ -84,7 +85,7 @@ function escaped(b)
         return [b]
     elseif b in map(UInt8, ('"', '\\', '\b', '\f', '\n', '\r', '\t'))
         return [BACKSLASH, escapechar(b)]
-    elseif iscntrl(Char(b)) || !isprint(Char(b))
+    elseif iscntrl(Char(b))
         return UInt8[BACKSLASH, LITTLE_U, hex(b, 4)...]
     else
         return [b]

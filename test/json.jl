@@ -42,10 +42,12 @@ end
     @test sprint(JSON2.write, [Inf]) == "[null]"
 end
 
+@static if VERSION < v"0.7.0-DEV.3017"
 @testset "Nullable" begin
     @test sprint(JSON2.write, [Nullable()]) == "[null]"
     @test sprint(JSON2.write, [Nullable{Int64}()]) == "[null]"
     @test sprint(JSON2.write, [Nullable{Int64}(Int64(1))]) == "[1]"
+end
 end
 
 @testset "Char" begin
@@ -776,10 +778,9 @@ obj = JSON2.read("{\"a\":2e10}")
 obj = JSON2.read("{\"\U0001d712\":\"\\ud835\\udf12\"}")
 @test_broken obj.𝜒 == "𝜒"
 
-eval(Expr(:struct, true, :t109,
-quote
+struct t109
     i::Int
-end))
+end
 
 let iob = IOBuffer()
     JSON2.write(iob, t109(1))

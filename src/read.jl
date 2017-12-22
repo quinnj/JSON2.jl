@@ -49,49 +49,6 @@ invalid(T, b) = ArgumentError("invalid JSON detected parsing type '$T': encounte
 
 read(str::String, T=Any, args...) = read(IOBuffer(str), T, args...)
 
-function generate_read_body(N, names, types, isnamedtuple, keywordargs)
-    body = quote
-        JSON2.@expect '{' # start of object
-        JSON2.wh!(io)
-        JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return T())
-        names = $names
-    end
-    keys = ((((Symbol("key_$j") for j = 1:i)...) for i = 1:N)...)
-    vals = ((((Symbol("val_$j") for j = 1:i)...) for i = 1:N)...)
-    foreach(1:N) do i
-        if isnamedtuple
-            ret = :(T(($((vals[i])...),)))
-        elseif keywordargs
-            ret = :(T(; $((:((Symbol($k), $v)) for (k, v) in zip(keys[i], vals[i]))...)))
-        else
-            ret = :(T($((vals[i])...)))
-        end
-        push!(body.args, quote
-            $(keys[i][i]) = JSON2.read(io, String)
-            $(keys[i][i]) = get(names, $(keys[i][i]), $(keys[i][i]))
-            JSON2.wh!(io)
-            JSON2.@expect ':'
-            JSON2.wh!(io)
-            $(vals[i][i]) = JSON2.read(io, $(types[i]))
-            JSON2.wh!(io)
-            JSON2.@expectoneof ',' '}'
-            if b == JSON2.CLOSE_CURLY_BRACE
-                return $ret
-            end
-            JSON2.wh!(io)
-        end)
-    end
-    push!(body.args, :(throw(ArgumentError("failed to parse $T from JSON"))))
-    # @show body
-    return body
-end
-
-@generated function read(io::IO, ::Type{T}) where {T}
-    N = fieldcount(T)
-    types = Tuple((t = fieldtype(T, i); ifelse(t <: Nullable, t, Union{t, Void})) for i = 1:N)
-    return generate_read_body(N, Dict{String, String}(), types, T <: NamedTuple, false)
-end
-
 # read generic JSON: detect null, Bool, Int, Float, String, Array, Dict/Object into a NamedTuple
 function read(io::IO, ::Type{Any}=Any)
     eof(io) && return NamedTuple()
@@ -102,6 +59,7 @@ function read(io::IO, ::Type{Any}=Any)
         return read(io, NamedTuple)
     elseif b == UInt('[')
         # array
+        # TODO: we could try and be fancy here and parse a more specific vector
         return read(io, Vector{Any})
     elseif (NEG_ONE < b < TEN) || (b == MINUS || b == PLUS)
         # int or float
@@ -113,7 +71,7 @@ function read(io::IO, ::Type{Any}=Any)
         return read(io, String)
     elseif b == UInt8('n')
         # null
-        return read(io, Void)
+        return read(io, Nothing)
     elseif b == UInt8('t')
         # true
         return read(io, Bool)
@@ -130,14 +88,14 @@ function read(io::IO, ::Type{Any}=Any)
     end
 end
 
-nonVoidT(::Type{Union{Void, T}}) where {T} = T
+nonNothingT(::Type{Union{Nothing, T}}) where {T} = T
 function read(io::IO, U::Union)
-    if U.a === Void || U.b === Void
+    if U.a === Nothing || U.b === Nothing
         b = peekbyte(io)
         if b == LITTLE_N
-            return read(io, Void)
+            return read(io, Nothing)
         else
-            return read(io, nonVoidT(U))
+            return read(io, nonNothingT(U))
         end
     else
         try
@@ -166,10 +124,10 @@ function read(io::IO, T::Type{NamedTuple})
         wh!(io)
     end
     @label done
-    return Base.namedtuple(NamedTuple{tuple(keys...)}, vals...)
+    return NamedTuple{Tuple(keys)}(Tuple(vals))
 end
 
-read(io::IO, ::Type{T}) where {T <: Associative} = read(io, T())
+read(io::IO, ::Type{T}) where {T <: AbstractDict} = read(io, T())
 function read(io::IO, dict::Dict{K,V}) where {K, V}
     T = typeof(dict)
     @expect '{'
@@ -190,7 +148,7 @@ function read(io::IO, dict::Dict{K,V}) where {K, V}
     return dict
 end
 
-read(io::IO, ::Type{T}) where {T <: Tuple} = tuple(read(io, Array)...)
+read(io::IO, ::Type{T}) where {T <: Tuple} = Tuple(read(io, Array))
 read(io::IO, ::Type{T}) where {T <: AbstractSet} = T(read(io, Array))
 read(io::IO, ::Type{T}) where {T <: AbstractArray} = read(io, T([]))
 
@@ -211,8 +169,20 @@ function read(io::IO, A::AbstractArray{eT}) where {eT}
 end
 
 function read(io::IO, ::Type{Function})
-    str = readuntil(io, '}')
-    return Function(str)
+    buf = IOBuffer()
+    wh!(io)
+    while !eof(io)
+        b = readbyte(io)
+        Base.write(buf, b)
+        b == UInt8('{') && break
+    end
+    bracketcount = 1
+    while !eof(io) && bracketcount > 0
+        b = readbyte(io)
+        Base.write(buf, b)
+        bracketcount += b == UInt8('{') ? 1 : b == UInt8('}') ? -1 : 0
+    end
+    return Function(String(take!(buf)))
 end
 
 # read Number, String, Nullable, Bool
@@ -251,20 +221,16 @@ function read(io::IO, T::Type{Char})
     @expect '"'
     return c
 end
-read(io::IO, ::Type{Date}, format=Dates.ISODateFormat) = Date(read(io, String), format)
-read(io::IO, ::Type{DateTime}, format=Dates.ISODateFormat) = DateTime(read(io, String), format)
+read(io::IO, ::Type{Dates.Date}, format=Dates.ISODateFormat) = Dates.Date(read(io, String), format)
+read(io::IO, ::Type{Dates.DateTime}, format=Dates.ISODateFormat) = Dates.DateTime(read(io, String), format)
+read(io::IO, ::Type{T}) where {T <: Enum} = eval(Base.datatype_module(T), read(io, Symbol))
 
-read(io::IO, ::Type{Nullable}) = (v = read(io, Any); return ifelse(v == nothing, Nullable(), Nullable(v)))
-function read(io::IO, ::Type{Nullable{T}}) where {T}
-    b = peekbyte(io)
-    if b == UInt8('n')
-        @expect 'n' 'u' 'l' 'l'
-        return Nullable{T}()
-    else
-        return Nullable(read(io, T))
-    end
+function read(io::IO, T::Type{Nothing})
+    @expect 'n' 'u' 'l' 'l'
+    return nothing
 end
-function read(io::IO, T::Type{Void})
+
+function read(io::IO, T::Type{Missing})
     @expect 'n' 'u' 'l' 'l'
     return nothing
 end
@@ -280,3 +246,191 @@ function read(io::IO, T::Type{Bool})
     end
 end
 
+function generate_default_read_body(N, types, jsontypes, isnamedtuple)
+    inner = Expr(:block)
+    keys = ((((Symbol("key_$j") for j = 1:i)...,) for i = 1:N)...,)
+    vals = ((((Symbol("val_$j") for j = 1:i)...,) for i = 1:N)...,)
+    foreach(1:N) do i
+        if isnamedtuple
+            ret = :(T(($((vals[i])...),)))
+        else
+            ret = :(T($((vals[i])...)))
+        end
+        push!(inner.args, quote
+            $(keys[i][i]) = JSON2.read(io, String)
+            JSON2.wh!(io)
+            JSON2.@expect ':'
+            JSON2.wh!(io)
+            $(vals[i][i]) = $(JSON2.getconvert(types[i]))(JSON2.read(io, $(jsontypes[i])))
+            JSON2.wh!(io)
+            JSON2.@expectoneof ',' '}'
+            b == JSON2.CLOSE_CURLY_BRACE && return $ret
+            JSON2.wh!(io)
+        end)
+    end
+    if isnamedtuple
+        ret = :(T(($((vals[N])...),)))
+    else
+        ret = :(T($((vals[N])...)))
+    end
+    body = quote
+        JSON2.@expect '{'
+        JSON2.wh!(io)
+        JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return T())
+        $inner
+        # in case there are extra fields, just ignore
+        while !eof(io)
+            JSON2.read(io, String)
+            JSON2.wh!(io)
+            JSON2.@expect ':'
+            JSON2.wh!(io)
+            JSON2.read(io, Any) # recursively reads value
+            JSON2.wh!(io)
+            JSON2.@expectoneof ',' '}'
+            b == JSON2.CLOSE_CURLY_BRACE && return $ret
+            JSON2.wh!(io)
+        end
+        throw(ArgumentError("failed to parse $T from JSON"))
+    end
+    # @show body
+    return body
+end
+
+const EMPTY_SYMBOL = Symbol("")
+
+function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fulltypes, fulljsontypes, args=(), argnm=EMPTY_SYMBOL, arg=nothing)
+    # @show name, names, T, types, jT, jsontypes, defaults, args, argnm, arg
+    # @show name == argnm
+    # @show names
+    # @show isempty(names)
+    if argnm != EMPTY_SYMBOL
+        if name == argnm
+            if isempty(names)
+                return ((args..., arg), b)
+            else
+                return JSON2.read_args(io, b,
+                    names[1], Base.tail(names),
+                    types[1], Base.tail(types),
+                    jsontypes[1], Base.tail(jsontypes),
+                    defaults, fulltypes, fulljsontypes,
+                    (args..., arg), EMPTY_SYMBOL, nothing)
+            end
+        else
+            if isempty(names)
+                return ((args..., defaults[name]), b)
+            else
+                return JSON2.read_args(io, b,
+                    names[1], Base.tail(names),
+                    types[1], Base.tail(types),
+                    jsontypes[1], Base.tail(jsontypes),
+                    defaults, fulltypes, fulljsontypes,
+                    (args..., defaults[name]), argnm, arg)
+            end
+        end
+    end
+    JSON2.wh!(io)
+    key = JSON2.read(io, Symbol)
+    JSON2.wh!(io)
+    JSON2.@expect ':'
+    JSON2.wh!(io)
+    if key == name
+        val = JSON2.getconvert(T)(JSON2.read(io, jT))
+    else
+        val = defaults[name]
+        if haskey(fulltypes, key)
+            argnm = key
+            arg = JSON2.getconvert(fulltypes[key])(JSON2.read(io, fulljsontypes[key]))
+        else
+            # ignore unknown field
+            JSON2.read(io, Any)
+        end
+    end
+    JSON2.wh!(io)
+    JSON2.@expectoneof ',' '}'
+    if isempty(names)
+        return ((args..., val), b)
+    else
+        return JSON2.read_args(io, b,
+            names[1], Base.tail(names),
+            types[1], Base.tail(types),
+            jsontypes[1], Base.tail(jsontypes),
+            defaults, fulltypes, fulljsontypes,
+            (args..., val), argnm, arg)
+    end
+end
+
+function generate_missing_read_body(names, types, jsontypes, defaults)
+    fulltypes = NamedTuple{names}(types)
+    fulljsontypes = NamedTuple{names}(jsontypes)
+    body = quote
+        JSON2.@expect '{'
+        JSON2.wh!(io)
+        JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return T())
+        args, b = JSON2.read_args(io, b,
+            $(QuoteNode(names[1])), $(Base.tail(names)),
+            $(types[1]), $(Base.tail(types)),
+            $(jsontypes[1]), $(Base.tail(jsontypes)),
+            $defaults, $fulltypes, $fulljsontypes)
+        # @show args, b
+        b == JSON2.CLOSE_CURLY_BRACE && return T(args...)
+        # in case there are extra fields, just ignore
+        while !eof(io)
+            JSON2.wh!(io)
+            JSON2.read(io, String)
+            JSON2.wh!(io)
+            JSON2.@expect ':'
+            JSON2.wh!(io)
+            JSON2.read(io, Any) # recursively reads value
+            JSON2.wh!(io)
+            JSON2.@expectoneof ',' '}'
+            b == JSON2.CLOSE_CURLY_BRACE && return T(args...)
+        end
+        throw(ArgumentError("failed to parse $T from JSON"))
+    end
+    # @show body
+    return body
+end
+
+function generate_read_body_noargs(N, names, jsontypes, defaults=NamedTuple())
+    body = quote
+        x = T()
+        JSON2.@expect '{' # start of object
+        JSON2.wh!(io)
+        JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return x)
+        names = $names
+        defaults = $defaults
+        allnames = Set($(names))
+        seen = Set{Symbol}()
+        jsontypes = $jsontypes
+        while !eof(io)
+            key = JSON2.read(io, Symbol)
+            key = get(names, key, key)
+            JSON2.wh!(io)
+            JSON2.@expect ':'
+            JSON2.wh!(io)
+            val = JSON2.read(io, get(jsontypes, key, Any))
+            key in allnames && Core.setfield!(x, key, val)
+            push!(seen, key)
+            JSON2.wh!(io)
+            JSON2.@expectoneof ',' '}'
+            b == JSON2.CLOSE_CURLY_BRACE && break
+            JSON2.wh!(io)
+        end
+        for i = 1:$N
+            key = fieldname(T, i)
+            if !(key in seen) && haskey(defaults, key)
+                Core.setfield!(x, key, defaults[key])
+            end
+        end
+        b == JSON2.CLOSE_CURLY_BRACE && return x
+        throw(ArgumentError("failed to parse $T from JSON"))
+    end
+    # @show body
+    return body
+end
+
+@generated function read(io::IO, ::Type{T}) where {T}
+    N = fieldcount(T)
+    types = Tuple(fieldtype(T, i) for i = 1:N)
+    return generate_default_read_body(N, types, types, T <: NamedTuple)
+end

@@ -1,10 +1,14 @@
-isempty(x::Union{Associative, AbstractArray, AbstractString, NamedTuple}) = length(x) == 0
+isempty(x::Union{AbstractDict, AbstractArray, AbstractString, Tuple, NamedTuple}) = length(x) == 0
 isempty(::Number) = false
-isempty(::Void) = true
+isempty(::Nothing) = true
 isempty(x) = false
 
 getconvert(::Type{String}) = string
-getconvert(T) = T
+number(::Type{T}, x::T) where {T} = x
+number(T, x::String) = parse(T, x)
+number(T, x) = convert(T, x)
+getconvert(::Type{T}) where {T <: Number} = x -> number(T, x)
+getconvert(T) = x -> convert(T, x)
 
 const BUF = IOBuffer()
 write(obj, args...) = (write(BUF, obj, args...); return String(take!(BUF)))
@@ -43,21 +47,24 @@ end
 write(io::IO, obj::Function) = (Base.write(io, obj.str); return)
 write(io::IO, obj::Number) = (Base.write(io, string(obj)); return)
 write(io::IO, obj::AbstractFloat) = (Base.print(io, isfinite(obj) ? obj : "null"); return)
+@static if VERSION < v"0.7.0-DEV.3017"
 write(io::IO, obj::Nullable{T}) where {T} = write(io, isnull(obj) ? nothing : get(obj))
-write(io::IO, obj::Date, f=Dates.ISODateFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
-write(io::IO, obj::DateTime, f=Dates.ISODateTimeFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
-write(io::IO, obj::Void) = (Base.write(io, "null"); return)
+end
+write(io::IO, obj::Dates.Date, f=Dates.ISODateFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
+write(io::IO, obj::Dates.DateTime, f=Dates.ISODateTimeFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
+write(io::IO, obj::Nothing) = (Base.write(io, "null"); return)
 write(io::IO, obj::Bool) = (Base.write(io, obj ? "true" : "false"); return)
 write(io::IO, obj::Union{Char, Symbol, Enum, Type}) = write(io, string(obj))
-write(io::IO, p::Pair) = write(io, (; Symbol(p.first)=>p.second))
+write(io::IO, p::Pair) = write(io, Dict(Symbol(p.first)=>p.second))
 
 # N = # of fields
 function generate_write_body(N, inds, names, omitempties, converts)
-    body = quote 
-        Base.write(io, '{')
-        j = 1
-    end
-    vals = ((Symbol("val_$i") for i = 1:N)...)
+    # @show N, inds, names
+    body = Expr(:block)
+    push!(body.args, :(Base.write(io, '{')))
+    push!(body.args, :(j = 1))
+
+    vals = ((Symbol("val_$i") for i = 1:N)...,)
     foreach(1:N) do i
         push!(body.args, quote
             nm = $(names[i])
