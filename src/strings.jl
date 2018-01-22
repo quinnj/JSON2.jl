@@ -96,7 +96,7 @@ const ESCAPECHARS = [escaped(b) for b = 0x00:0xff]
 const NEEDESCAPE = [length(x) > 1 for x in ESCAPECHARS]
 
 function needescape(str)
-    bytes = Vector{UInt8}(str)
+    bytes = codeunits(str)
     @simd for i = 1:length(bytes)
         @inbounds NEEDESCAPE[bytes[i] + 0x01] && return true
     end
@@ -106,7 +106,7 @@ end
 function write(io::IO, obj::AbstractString)
     Base.write(io, '"')
     if needescape(obj)
-        bytes = Vector{UInt8}(obj)
+        bytes = codeunits(obj)
         for i = 1:length(bytes)
             @inbounds b = JSON2.ESCAPECHARS[bytes[i] + 0x01]
             Base.write(io, b)
@@ -122,7 +122,7 @@ end
 const BACKSLASH = UInt8('\\')
 
 function unescape(str)
-    bytes = Vector{UInt8}(str)
+    bytes = codeunits(str)
     # skip the opening/closing '"'
     i = 1
     len = length(str)
