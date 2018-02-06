@@ -29,12 +29,6 @@ macro format(T, expr)
     end
 end
 
-function namedtuple(names, types, nt)
-    return NamedTuple{map(x->get(names, x, x), keys(nt))}(
-        Tuple(map(x->JSON2.getconvert(get(types, x[1], Any))(x[2]), collect(pairs(nt))))
-    )
-end
-
 """
     JSON2.@format T [noargs|keywordargs] begin
         _field_ => (; options...)
@@ -125,7 +119,7 @@ macro format(T, typetype, expr)
             @generated function JSON2.read(io::IO, T::Type{$T})
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
-                names = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
+                names = (; ((Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 jsontypes = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(get(fieldformats, nm, NamedTuple()), :jsontype, fieldtype($T, i))) for (i, nm) in enumerate(fieldnames($T)) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
                 return JSON2.generate_read_body_noargs(N, names, jsontypes, defaults)
@@ -137,13 +131,30 @@ macro format(T, typetype, expr)
             @generated function JSON2.read(io::IO, T::Type{$T})
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
-                names = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :name))...)
+                names = (; ((Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :name))...)
                 types = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(get(fieldformats, nm, NamedTuple()), :jsontype, fieldtype($T, i))) for (i, nm) in enumerate(fieldnames($T)) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
                 q = quote
-                    nt = JSON2.read(io, NamedTuple)
-                    ntt = JSON2.namedtuple($names, $types, nt)
-                    return T(; $defaults..., ntt...)
+                    JSON2.@expect '{'
+                    JSON2.wh!(io)
+                    keys = Symbol[]
+                    vals = Any[]
+                    JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); @goto done)
+                    typemap = $types
+                    while true
+                        key = JSON2.read(io, Symbol)
+                        push!(keys, key)
+                        JSON2.wh!(io)
+                        JSON2.@expect ':'
+                        JSON2.wh!(io)
+                        push!(vals, JSON2.read(io, typemap[key])) # recursively reads value
+                        JSON2.wh!(io)
+                        JSON2.@expectoneof ',' '}'
+                        b == JSON2.CLOSE_CURLY_BRACE && @goto done
+                        JSON2.wh!(io)
+                    end
+                    @label done
+                    return T(; $defaults..., NamedTuple{Tuple(keys)}(Tuple(vals))...)
                 end
                 # @show q
                 return q
@@ -155,7 +166,7 @@ macro format(T, typetype, expr)
             @generated function JSON2.read(io::IO, T::Type{$T})
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
-                names = Tuple(get(get(fieldformats, nm, NamedTuple()), :name, nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))
+                names = Tuple(Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))
                 types = Tuple(fieldtype($T, i) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 jsontypes = Tuple(get(get(fieldformats, fieldname($T, i), NamedTuple()), :jsontype, fieldtype($T, i)) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
@@ -163,6 +174,7 @@ macro format(T, typetype, expr)
             end
             $wr
         end)
+        # @show q
     else
         q = esc(quote
             @generated function JSON2.read(io::IO, T::Type{$T})
