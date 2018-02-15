@@ -64,7 +64,7 @@ function read(io::IO, ::Type{Any}=Any)
     elseif (NEG_ONE < b < TEN) || (b == MINUS || b == PLUS)
         # int or float
         fl = read(io, Float64)
-        int = trunc(Int, fl)
+        int = unsafe_trunc(Int, fl)
         return ifelse(int == fl, int, fl)
     elseif b == UInt8('"')
         # string)
