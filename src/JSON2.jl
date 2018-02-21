@@ -147,7 +147,7 @@ macro format(T, typetype, expr)
                         JSON2.wh!(io)
                         JSON2.@expect ':'
                         JSON2.wh!(io)
-                        push!(vals, JSON2.read(io, typemap[key])) # recursively reads value
+                        push!(vals, JSON2.read(io, get(typemap, key, Any))) # recursively reads value
                         JSON2.wh!(io)
                         JSON2.@expectoneof ',' '}'
                         b == JSON2.CLOSE_CURLY_BRACE && @goto done
