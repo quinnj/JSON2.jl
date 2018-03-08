@@ -86,7 +86,7 @@ function escaped(b)
     elseif b in map(UInt8, ('"', '\\', '\b', '\f', '\n', '\r', '\t'))
         return [BACKSLASH, escapechar(b)]
     elseif iscntrl(Char(b))
-        return UInt8[BACKSLASH, LITTLE_U, hex(b, 4)...]
+        return UInt8[BACKSLASH, LITTLE_U, string(b, base=16, pad=4)...]
     else
         return [b]
     end

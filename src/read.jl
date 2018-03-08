@@ -414,7 +414,7 @@ function generate_missing_read_body(names, types, jsontypes, defaults)
             elseif b == JSON2.CLOSE_CURLY_BRACE
                 curlies -= 1
             end
-            curlies == 0 && return $ret
+            curlies == 0 && return T(args...)
         end
         throw(ArgumentError("failed to parse $T from JSON"))
     end
