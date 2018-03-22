@@ -22,7 +22,7 @@ function getformats(nm; kwargs...)
 end
 
 macro format(T, expr)
-    if contains(string(expr), "keywordargs") || contains(string(expr), "noargs")
+    if occursin("keywordargs", string(expr)) || occursin("noargs", string(expr))
         esc(:(JSON2.@format($T, $expr, $(Expr(:block)))))
     else
         esc(:(JSON2.@format($T, "", $expr)))
@@ -114,7 +114,7 @@ macro format(T, typetype, expr)
             return ex
         end
     end
-    if contains(string(typetype), "noargs")
+    if occursin("noargs", string(typetype))
         q = esc(quote
             @generated function JSON2.read(io::IO, T::Type{$T})
                 N = fieldcount($T)
@@ -126,7 +126,7 @@ macro format(T, typetype, expr)
             end
             $wr
         end)
-    elseif contains(string(typetype), "keywordargs")
+    elseif occursin("keywordargs", string(typetype))
         q = esc(quote
             @generated function JSON2.read(io::IO, T::Type{$T})
                 N = fieldcount($T)
