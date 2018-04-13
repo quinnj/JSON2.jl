@@ -125,7 +125,7 @@ function unescape(str)
     bytes = codeunits(str)
     # skip the opening/closing '"'
     i = 1
-    len = length(str)
+    len = length(bytes)
     while i <= len
         @inbounds b = bytes[i]
         i += 1
