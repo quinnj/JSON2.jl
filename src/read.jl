@@ -209,34 +209,8 @@ function read(io::IO, ::Type{Function})
 end
 
 # read Number, String, Nullable, Bool
-function read(io::IO, ::Type{T}) where {T <: Integer}
-    eof(io) && throw(ArgumentError("early EOF"))
-    v = zero(T)
-    b = peekbyte(io)
-    parseddigits = false
-    negative = false
-    if b == MINUS # check for leading '-' or '+'
-        negative = true
-        readbyte(io)
-        b = peekbyte(io)
-    elseif b == PLUS
-        readbyte(io)
-        b = peekbyte(io)
-    end
-    while NEG_ONE < b < TEN
-        parseddigits = true
-        b = readbyte(io)
-        v, ov_mul = Base.mul_with_overflow(v, T(10))
-        v, ov_add = Base.add_with_overflow(v, T(b - ZERO))
-        (ov_mul | ov_add) && throw(OverflowError("overflow parsing $T, parsed $v"))
-        eof(io) && break
-        b = peekbyte(io)
-    end
-    !parseddigits && throw(invalid(T, b))
-    return ifelse(negative, -v, v)
-end
-
-include("floatparsing.jl")
+read(io::IO, ::Type{T}) where {T <: Integer} = Parsers.parse(io, T)
+read(io::IO, ::Type{T}) where {T <: AbstractFloat} = Parsers.parse(io, T)
 
 function read(io::IO, T::Type{Char})
     @expect '"'

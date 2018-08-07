@@ -22,7 +22,7 @@ const FAILURES = [
 
 @testset for fail in FAILURES
     # Test memory parser
-    @test_throws ArgumentError JSON2.read(fail)
+    @test_throws Union{Parsers.Error, ArgumentError} JSON2.read(fail)
 end
 
 @enum Animal zebra aardvark horse

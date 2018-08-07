@@ -1,7 +1,6 @@
-__precompile__(true)
 module JSON2
 
-using Dates
+using Dates, Parsers
 
 # for reading/writing javascript functions as value literals
 struct Function

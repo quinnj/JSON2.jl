@@ -1,4 +1,4 @@
-using JSON2, Test, Dates
+using JSON2, Parsers, Test, Dates
 include("json.jl")
 include("custom.jl")
 
@@ -171,9 +171,9 @@ JSON2.pretty(io, json)
 @test_throws ArgumentError JSON2.read("abcd", Nothing)
 
 @test_throws ArgumentError JSON2.read("nule", Union{Nothing, Int})
-@test_throws ArgumentError JSON2.read("abc", Union{Nothing, Int})
+@test_throws Parsers.Error JSON2.read("abc", Union{Nothing, Int})
 
-@test_throws ArgumentError JSON2.read("abc", Int)
+@test_throws Parsers.Error JSON2.read("abc", Int)
 
 @test_throws ArgumentError JSON2.read("a", Char)
 @test_throws ArgumentError JSON2.read("\"abc\"", Char)
