@@ -4,7 +4,7 @@ macro pretty(json)
     return esc(:(JSON2.pretty($json)))
 end
 
-pretty(str) = pretty(STDOUT, str)
+pretty(str) = pretty(stdout, str)
 function pretty(out::IO, str::String, indent=0, offset=0)
     io = IOBuffer(str)
     eof(io) && return
