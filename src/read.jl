@@ -399,6 +399,7 @@ end
 function generate_read_body_noargs(N, names, jsontypes, defaults=NamedTuple())
     body = quote
         x = T()
+        eof(io) && return x
         JSON2.@expect '{' # start of object
         JSON2.wh!(io)
         JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return x)
