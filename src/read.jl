@@ -229,7 +229,7 @@ end
 
 function read(io::IO, T::Type{Missing})
     @expect 'n' 'u' 'l' 'l'
-    return nothing
+    return missing
 end
 
 function read(io::IO, T::Type{Bool})
