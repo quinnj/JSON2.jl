@@ -25,6 +25,10 @@ include("custom.jl")
 @test JSON2.read("1.1", Union{Nothing, Float64}) === 1.1
 @test JSON2.read("null", Union{Nothing, Float64}) === nothing
 
+# Enum
+@enum FRUIT apple orange banana
+@test JSON2.read(JSON2.write(apple), FRUIT) === apple
+
 # NamedTuple
 @test JSON2.read("{\"hey\":1}", NamedTuple) == (hey=1,)
 @test JSON2.read("{\"hey\":1,\"ho\":2}", NamedTuple) == (hey=1,ho=2)

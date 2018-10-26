@@ -220,7 +220,7 @@ function read(io::IO, T::Type{Char})
 end
 read(io::IO, ::Type{Dates.Date}, format=Dates.ISODateFormat) = Dates.Date(read(io, String), format)
 read(io::IO, ::Type{Dates.DateTime}, format=Dates.ISODateFormat) = Dates.DateTime(read(io, String), format)
-read(io::IO, ::Type{T}) where {T <: Enum} = eval(Base.datatype_module(T), read(io, Symbol))
+read(io::IO, ::Type{T}) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol))
 
 function read(io::IO, T::Type{Nothing})
     @expect 'n' 'u' 'l' 'l'
