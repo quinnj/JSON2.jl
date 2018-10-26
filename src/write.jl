@@ -47,12 +47,10 @@ end
 write(io::IO, obj::Function) = (Base.write(io, obj.str); return)
 write(io::IO, obj::Number) = (Base.write(io, string(obj)); return)
 write(io::IO, obj::AbstractFloat) = (Base.print(io, isfinite(obj) ? obj : "null"); return)
-@static if VERSION < v"0.7.0-DEV.3017"
-write(io::IO, obj::Nullable{T}) where {T} = write(io, isnull(obj) ? nothing : get(obj))
-end
 write(io::IO, obj::Dates.Date, f=Dates.ISODateFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
 write(io::IO, obj::Dates.DateTime, f=Dates.ISODateTimeFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
 write(io::IO, obj::Nothing) = (Base.write(io, "null"); return)
+write(io::IO, obj::Missing) = (Base.write(io, "null"); return)
 write(io::IO, obj::Bool) = (Base.write(io, obj ? "true" : "false"); return)
 write(io::IO, obj::Union{Char, Symbol, Enum, Type}) = write(io, string(obj))
 write(io::IO, p::Pair) = write(io, Dict(Symbol(p.first)=>p.second))

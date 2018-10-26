@@ -81,13 +81,6 @@ end
 @test JSON2.write(:hey) == "\"hey\""
 @test JSON2.read(JSON2.write(:hey), Symbol) == :hey
 
-@static if VERSION < v"0.7.0-DEV.3017"
-@test JSON2.write(Nullable()) == "null"
-@test isnull(JSON2.read(JSON2.write(Nullable()), Nullable))
-@test JSON2.write(Nullable("hey")) == "\"hey\""
-@test JSON2.read(JSON2.write(Nullable("hey")), Nullable{String}) === Nullable("hey")
-end
-
 @test JSON2.write(Date(2017, 1, 1)) == "\"2017-01-01\""
 @test JSON2.read(JSON2.write(Date(2017, 1, 1)), Date) == Date(2017, 1, 1)
 df = dateformat"mm/dd/yyyy"
@@ -95,7 +88,10 @@ df = dateformat"mm/dd/yyyy"
 @test JSON2.read(JSON2.write(Date(2017, 1, 1), df), Date, df) == Date(2017, 1, 1)
 
 @test JSON2.write(nothing) == "null"
-@test JSON2.read(JSON2.write(nothing), Nothing) == nothing
+@test JSON2.read(JSON2.write(nothing), Nothing) === nothing
+
+@test JSON2.write(missing) == "null"
+@test JSON2.read(JSON2.write(missing), Missing) === missing
 
 @test JSON2.write(true) == "true"
 @test JSON2.read(JSON2.write(true), Bool) == true
