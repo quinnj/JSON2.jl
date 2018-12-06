@@ -18,7 +18,7 @@ julia> Pkg.add("JSON2")
 
 ## Project Status
 
-The package is tested against the current Julia `0.6` release and nightly on Linux and OS X.
+The package is tested against the current Julia `v1.0` release and nightly on Linux and OS X.
 
 ## Contributing and Questions
 
