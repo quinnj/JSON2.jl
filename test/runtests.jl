@@ -177,3 +177,17 @@ JSON2.pretty(io, json)
 
 @test_throws ArgumentError JSON2.read("a", Char)
 @test_throws ArgumentError JSON2.read("\"abc\"", Char)
+
+# test read(data::Vector{UInt8})
+@test JSON2.read(Vector{UInt8}("")) == NamedTuple()
+@test JSON2.read(Vector{UInt8}("{\"hey\":1}")) == (hey=1,)
+@test JSON2.read(Vector{UInt8}("[\"hey\",1]")) == ["hey",1]
+@test JSON2.read(Vector{UInt8}("1.0")) === 1
+@test JSON2.read(Vector{UInt8}("1")) === 1
+@test JSON2.read(Vector{UInt8}("1.1")) === 1.1
+@test JSON2.read(Vector{UInt8}("+1.1")) === 1.1
+@test JSON2.read(Vector{UInt8}("-1.1")) === -1.1
+@test JSON2.read(Vector{UInt8}("\"hey\"")) == "hey"
+@test JSON2.read(Vector{UInt8}("null")) === nothing
+@test JSON2.read(Vector{UInt8}("true")) === true
+@test JSON2.read(Vector{UInt8}("false")) === false
