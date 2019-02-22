@@ -278,7 +278,7 @@ function generate_default_read_body(N, types, jsontypes, isnamedtuple)
         # in case there are extra fields, just ignore
         curlies = 1
         while !eof(io)
-            b = readbyte(io)
+            b = JSON2.readbyte(io)
             if b == JSON2.OPEN_CURLY_BRACE
                 curlies += 1
             elseif b == JSON2.CLOSE_CURLY_BRACE
@@ -382,7 +382,7 @@ function generate_missing_read_body(names, types, jsontypes, defaults)
         # in case there are extra fields, just ignore
         curlies = 1
         while !eof(io)
-            b = readbyte(io)
+            b = JSON2.readbyte(io)
             if b == JSON2.OPEN_CURLY_BRACE
                 curlies += 1
             elseif b == JSON2.CLOSE_CURLY_BRACE
