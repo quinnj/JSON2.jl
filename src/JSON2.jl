@@ -2,6 +2,22 @@ module JSON2
 
 using Dates, Parsers
 
+import Parsers: readbyte, peekbyte
+
+function __init__()
+    Threads.resize_nthreads!(STRINGESCAPEBUFFERS)
+end
+
+const STRINGESCAPEBUFFERS = [Parsers.StringBuffer()]
+
+function getescapebuffer(str)
+    io = STRINGESCAPEBUFFERS[Threads.threadid()]
+    io.data = str
+    io.ptr = 1
+    io.size = sizeof(str)
+    return io
+end
+
 # for reading/writing javascript functions as value literals
 struct Function
     str::String

@@ -5,7 +5,7 @@ isempty(x) = false
 
 getconvert(::Type{String}) = string
 number(::Type{T}, x::T) where {T} = x
-number(T, x::String) = parse(T, x)
+number(T, x::String) = Parsers.parse(T, x)
 number(T, x) = convert(T, x)
 getconvert(::Type{T}) where {T <: Number} = x -> number(T, x)
 getconvert(T) = x -> convert(T, x)

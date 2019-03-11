@@ -1,17 +1,3 @@
-readbyte(from::IO) = Base.read(from, UInt8)
-peekbyte(from::IO) = Base.peek(from)
-
-@inline function readbyte(from::IOBuffer)
-    @inbounds byte = from.data[from.ptr]
-    from.ptr = from.ptr + 1
-    return byte
-end
-
-@inline function peekbyte(from::IOBuffer)
-    @inbounds byte = from.data[from.ptr]
-    return byte
-end
-
 macro expect(ch...)
     N = length(ch)
     uint8s = map(UInt8, ch)

@@ -62,19 +62,17 @@ function reverseescapechar(b)
 end
 
 charvalue(b) = (NEG_ONE < b < TEN)         ? b - ZERO            :
-               (LITTLE_A <= b <= LITTLE_F) ? b - LITTLE_A - 0x0a :
-               (BIG_A <= b <= BIG_F)       ? b - BIG_A - 0x0a    :
+               (LITTLE_A <= b <= LITTLE_F) ? b - (LITTLE_A - 0x0a) :
+               (BIG_A <= b <= BIG_F)       ? b - (BIG_A - 0x0a)    :
                throw(ArgumentError("JSON invalid unicode hex value"))
 
-function readhexchar(bytes, i)
+function readhexchar(io)
     n = 0x0000
-    foreach(1:4) do _
-        @inbounds b = bytes[i]
-        i += 1
-        n <<= 4
-        n += charvalue(b)
+    for _ = 1:4
+        b = readbyte(io)
+        n = (n << 4) + charvalue(b)
     end
-    return Char(n), i
+    return Char(n)
 end
 
 iscntrl(c::Char) = c <= '\x1f' || '\x7f' <= c <= '\u9f'
@@ -108,7 +106,7 @@ function write(io::IO, obj::AbstractString)
     if needescape(obj)
         bytes = codeunits(obj)
         for i = 1:length(bytes)
-            @inbounds b = JSON2.ESCAPECHARS[bytes[i] + 0x01]
+            @inbounds b = ESCAPECHARS[bytes[i] + 0x01]
             Base.write(io, b)
         end
     else
@@ -122,18 +120,14 @@ end
 const BACKSLASH = UInt8('\\')
 
 function unescape(str)
-    bytes = codeunits(str)
-    # skip the opening/closing '"'
-    i = 1
-    len = length(bytes)
-    while i <= len
-        @inbounds b = bytes[i]
-        i += 1
-        if b == BACKSLASH
-            @inbounds b = bytes[i]
-            i += 1
+    io = getescapebuffer(str)
+    while !eof(io)
+        b = readbyte(io)
+        if b === BACKSLASH
+            eof(io) && throw(ArgumentError("invalid escape character in JSON string"))
+            b = readbyte(io)
             if b == LITTLE_U
-                c, i = readhexchar(bytes, i)
+                c = readhexchar(io)
                 Base.write(BUF, c)
             else
                 d = reverseescapechar(b)
@@ -169,14 +163,14 @@ function read(io::IO, T::Type{String})
 end
 
 function read(io::IOBuffer, T::Type{String})
-    JSON2.@expect '"'
+    @expect '"'
     ptr = pointer(io.data, io.ptr)
     b = readbyte(io)
     len = 0
     hasescapechars = false
-    while b != JSON2.QUOTE
+    while b != QUOTE
         len += 1
-        if b == JSON2.BACKSLASH
+        if b == BACKSLASH
             eof(io) && throw(ArgumentError("early EOF"))
             hasescapechars = true
             b = readbyte(io)
@@ -190,14 +184,14 @@ function read(io::IOBuffer, T::Type{String})
 end
 
 function read(io::IOBuffer, T::Type{Symbol})
-    JSON2.@expect '"'
+    @expect '"'
     ptr = pointer(io.data, io.ptr)
     b = readbyte(io)
     len = 0
     hasescapechars = false
-    while b != JSON2.QUOTE
+    while b != QUOTE
         len += 1
-        if b == JSON2.BACKSLASH
+        if b == BACKSLASH
             eof(io) && throw(ArgumentError("early EOF"))
             hasescapechars = true
             b = readbyte(io)

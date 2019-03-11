@@ -177,3 +177,5 @@ JSON2.pretty(io, json)
 
 @test_throws ArgumentError JSON2.read("a", Char)
 @test_throws ArgumentError JSON2.read("\"abc\"", Char)
+
+@test JSON2.read(IOBuffer("\"\\u003e\\u003d\$1B\""), String) == ">=\$1B"
