@@ -84,9 +84,11 @@ function read(io::IO, U::Union)
             return read(io, nonNothingT(U))
         end
     else
+        pos = position(io)
         try
             return read(io, U.a)
         catch
+            seek(io, pos)
             return read(io, U.b)
         end
     end
