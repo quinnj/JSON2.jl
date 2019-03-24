@@ -11,17 +11,17 @@ getconvert(::Type{T}) where {T <: Number} = x -> number(T, x)
 getconvert(T) = x -> convert(T, x)
 
 const BUF = IOBuffer()
-write(obj, args...) = (write(BUF, obj, args...); return String(take!(BUF)))
+write(obj, opts::Opts=defaultopts(obj), args...) = (write(BUF, obj, opts, args...); return String(take!(BUF)))
 
-function write(io::IO, obj::Dict{K, V}) where {K, V}
+function write(io::IO, obj::Dict{K, V}, opts::Opts=Opts()) where {K, V}
     Base.write(io, '{')
     isempty(obj) && @goto done
     len = length(obj)
     i = 1
     for (k, v) in obj
-        write(io, string(k))
+        write(io, string(k), opts)
         Base.write(io, ':')
-        write(io, v) # recursive
+        write(io, v, opts) # recursive
         i < len && Base.write(io, ',')
         i += 1
     end
@@ -30,13 +30,13 @@ function write(io::IO, obj::Dict{K, V}) where {K, V}
     return
 end
 
-function write(io::IO, obj::Union{AbstractArray,Tuple,AbstractSet})
+function write(io::IO, obj::Union{AbstractArray,Tuple,AbstractSet}, opts::Opts=Opts())
     # always written as single array
     Base.write(io, '[')
     len = length(obj)
     i = 1
     for x in obj
-        write(io, x) # recursive
+        write(io, x, opts) # recursive
         i < len && Base.write(io, ',')
         i += 1
     end
@@ -44,19 +44,19 @@ function write(io::IO, obj::Union{AbstractArray,Tuple,AbstractSet})
     return
 end
 
-write(io::IO, obj::Function) = (Base.write(io, obj.str); return)
-write(io::IO, obj::Number) = (Base.write(io, string(obj)); return)
-write(io::IO, obj::AbstractFloat) = (Base.print(io, isfinite(obj) ? obj : "null"); return)
-write(io::IO, obj::Dates.Date, f=Dates.ISODateFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
-write(io::IO, obj::Dates.DateTime, f=Dates.ISODateTimeFormat) = (Base.write(io, "\"$(Dates.format(obj, f))\"")  ; return)
-write(io::IO, obj::Nothing) = (Base.write(io, "null"); return)
-write(io::IO, obj::Missing) = (Base.write(io, "null"); return)
-write(io::IO, obj::Bool) = (Base.write(io, obj ? "true" : "false"); return)
-write(io::IO, obj::Union{Char, Symbol, Enum, Type}) = write(io, string(obj))
-write(io::IO, p::Pair) = write(io, Dict(Symbol(p.first)=>p.second))
+write(io::IO, obj::Function, ::Opts=Opts()) = (Base.write(io, obj.str); return)
+write(io::IO, obj::Number, ::Opts=Opts()) = (Base.write(io, string(obj)); return)
+write(io::IO, obj::AbstractFloat, ::Opts=Opts()) = (Base.print(io, isfinite(obj) ? obj : "null"); return)
+write(io::IO, obj::Date, opts::Opts=Opts()) = (Base.write(io, "\"$(Dates.format(obj, opts.date))\"")  ; return)
+write(io::IO, obj::DateTime, opts::Opts=Opts()) = (Base.write(io, "\"$(Dates.format(obj, opts.datetime))\"")  ; return)
+write(io::IO, obj::Nothing, ::Opts=Opts()) = (Base.write(io, "null"); return)
+write(io::IO, obj::Missing, ::Opts=Opts()) = (Base.write(io, "null"); return)
+write(io::IO, obj::Bool, ::Opts=Opts()) = (Base.write(io, obj ? "true" : "false"); return)
+write(io::IO, obj::Union{Char, Symbol, Enum, Type}, opts::Opts=Opts()) = write(io, string(obj), opts)
+write(io::IO, p::Pair, opts::Opts=Opts()) = write(io, Dict(Symbol(p.first)=>p.second), opts)
 
 # N = # of fields
-function generate_write_body(N, inds, names, omitempties, converts)
+function generate_write_body(N, inds, names, omitempties, converts, opts)
     # @show N, inds, names
     body = Expr(:block)
     push!(body.args, :(Base.write(io, '{')))
@@ -70,17 +70,17 @@ function generate_write_body(N, inds, names, omitempties, converts)
                 $(vals[i]) = getfield(obj, $(inds[i]))
                 if !($(omitempties[i])) || !JSON2.isempty($(vals[i]))
                     j == 1 || Base.write(io, ',')
-                    JSON2.write(io, string(nm))
+                    JSON2.write(io, string(nm), opts)
                     Base.write(io, ':')
-                    JSON2.write(io, $(converts[i])($(vals[i])))
+                    JSON2.write(io, $(converts[i])($(vals[i])), opts)
                     j += 1
                 end
             else
                 if !$(omitempties[i])
                     j == 1 || Base.write(io, ',')
-                    JSON2.write(io, string(nm))
+                    JSON2.write(io, string(nm), opts)
                     Base.write(io, ':')
-                    JSON2.write(io, nothing)
+                    JSON2.write(io, nothing, opts)
                     j += 1
                 end
             end
@@ -91,12 +91,12 @@ function generate_write_body(N, inds, names, omitempties, converts)
     return body
 end
 
-@generated function write(io::IO, obj::T) where {T}
+@generated function write(io::IO, obj::T, opts::Opts=defaultopts(T)) where {T}
     N = fieldcount(T)
     inds = Tuple(1:N)
     names = Tuple(string(fieldname(T, i)) for i in inds)
     omitempties = Tuple(false for i in inds)
     converts = Tuple(getconvert(fieldtype(T, i)) for i in inds)
-    ex = generate_write_body(N, inds, names, omitempties, converts)
+    ex = generate_write_body(N, inds, names, omitempties, converts, opts)
     return ex
 end

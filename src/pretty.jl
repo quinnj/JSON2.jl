@@ -1,11 +1,11 @@
 export @pretty
 
-macro pretty(json)
-    return esc(:(JSON2.pretty($json)))
+macro pretty(json, opts=:(JSON2.Opts()))
+    return esc(:(JSON2.pretty($json, $opts)))
 end
 
-pretty(str) = pretty(stdout, str)
-function pretty(out::IO, str::String, indent=0, offset=0)
+pretty(str, opts::Opts=Opts()) = pretty(stdout, str, opts)
+function pretty(out::IO, str::String, opts::Opts=Opts(), indent=0, offset=0)
     io = IOBuffer(str)
     eof(io) && return
     JSON2.wh!(io)
@@ -21,11 +21,11 @@ function pretty(out::IO, str::String, indent=0, offset=0)
         # loop thru all key-value pairs, keeping track of longest key to pad others
         while b != UInt8('}')
             JSON2.wh!(io)
-            push!(keys, JSON2.read(io, String))
+            push!(keys, JSON2.read(io, String, opts))
             JSON2.wh!(io)
             JSON2.readbyte(io) # ':'
             JSON2.wh!(io)
-            push!(vals, JSON2.read(io, Any))
+            push!(vals, JSON2.read(io, Any, opts))
             b = JSON2.readbyte(io)
         end
         maxlen = maximum(map(length, keys)) + 5
@@ -33,7 +33,7 @@ function pretty(out::IO, str::String, indent=0, offset=0)
         for i = 1:length(keys)
             Base.write(out, "  "^indent)
             Base.write(out, lpad("\"$(keys[i])\"" * ": ", maxlen + offset, ' '))
-            pretty(out, JSON2.write(vals[i]), indent, maxlen + offset)
+            pretty(out, JSON2.write(vals[i], opts), opts, indent, maxlen + offset)
             if i == length(keys)
                 indent -= 1
                 Base.write(out, "\n" * ("  "^indent * " "^offset) * "}")
@@ -52,13 +52,13 @@ function pretty(out::IO, str::String, indent=0, offset=0)
         vals = []
         while b != UInt8(']')
             JSON2.wh!(io)
-            push!(vals, JSON2.read(io, Any))
+            push!(vals, JSON2.read(io, Any, opts))
             JSON2.wh!(io)
             b = JSON2.readbyte(io)
         end
         for (i, val) in enumerate(vals)
             Base.write(out, "  "^indent * " "^offset)
-            pretty(out, JSON2.write(vals[i]), indent, offset)
+            pretty(out, JSON2.write(vals[i], opts), opts, indent, offset)
             if i == length(vals)
                 indent -= 1
                 Base.write(out, "\n" * ("  "^indent * " "^offset) * "]")

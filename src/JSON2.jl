@@ -23,6 +23,13 @@ struct Function
     str::String
 end
 
+Base.@kwdef struct Opts
+    date::DateFormat = ISODateFormat
+    datetime::DateFormat = ISODateTimeFormat
+end
+defaultopts(::Type) = Opts()
+defaultopts(x::T) where T = defaultopts(T)
+
 include("write.jl")
 include("read.jl")
 include("strings.jl")
@@ -51,7 +58,7 @@ end
     end
 
 Specify a custom JSON formatting for a struct `T`. Options include:
-    `name`: 
+    `name`:
     `jsontype`:
     `omitempty`:
     `exclude`:
@@ -85,7 +92,7 @@ Again, the default case is for JSON input that will have consistently ordered, a
     This says that, when reading from a JSON input, if field `c` isn't present, to set it's value to 0.
 
     - If the JSON input is not consistenly-ordered, there are two other options for allowing direct type parsing:
-      
+
       ```
       T(; a=0, b=0, c=0, kwargs...) = T(a, b, c)
       JSON2.@format T keywordargs begin
@@ -116,7 +123,7 @@ macro format(T, typetype, expr)
     foreach(x->x.args[2] = QuoteNode(x.args[2]), args)
     anydefaults = any(z->:default in z, map(x->map(y->y.args[1], x.args[3].args), args))
     wr = quote
-        @generated function JSON2.write(io::IO, obj::$T)
+        @generated function JSON2.write(io::IO, obj::$T, opts::JSON2.Opts=JSON2.defaultopts($T))
             fieldformats = [JSON2.getformats(nm; $(args...)) for nm in fieldnames($T)]
             # @show fieldformats
             inds = Tuple(i for i = 1:length(fieldformats) if !get(fieldformats[i], :exclude, false))
@@ -124,26 +131,26 @@ macro format(T, typetype, expr)
             omitempties = Tuple(get(fieldformats[i], :omitempty, false) for i in inds)
             converts = Tuple(JSON2.getconvert(get(fieldformats[i], :jsontype, fieldtype($T, i))) for i in inds)
             N = length(inds)
-            ex = JSON2.generate_write_body(N, inds, names, omitempties, converts)
+            ex = JSON2.generate_write_body(N, inds, names, omitempties, converts, opts)
             # @show ex
             return ex
         end
     end
     if occursin("noargs", string(typetype))
         q = esc(quote
-            @generated function JSON2.read(io::IO, T::Type{$T})
+            @generated function JSON2.read(io::IO, T::Type{$T}, opts::JSON2.Opts=JSON2.defaultopts($T))
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
                 names = (; ((Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 jsontypes = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(get(fieldformats, nm, NamedTuple()), :jsontype, fieldtype($T, i))) for (i, nm) in enumerate(fieldnames($T)) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
-                return JSON2.generate_read_body_noargs(N, names, jsontypes, defaults)
+                return JSON2.generate_read_body_noargs(N, names, jsontypes, defaults, opts)
             end
             $wr
         end)
     elseif occursin("keywordargs", string(typetype))
         q = esc(quote
-            @generated function JSON2.read(io::IO, T::Type{$T})
+            @generated function JSON2.read(io::IO, T::Type{$T}, opts::JSON2.Opts=JSON2.defaultopts($T))
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
                 names = (; ((Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)), nm) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :name))...)
@@ -178,26 +185,26 @@ macro format(T, typetype, expr)
         end)
     elseif anydefaults
         q = esc(quote
-            @generated function JSON2.read(io::IO, T::Type{$T})
+            @generated function JSON2.read(io::IO, T::Type{$T}, opts::JSON2.Opts=JSON2.defaultopts($T))
                 N = fieldcount($T)
                 fieldformats = Dict($(args...))
                 names = Tuple(Symbol(get(get(fieldformats, nm, NamedTuple()), :name, nm)) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))
                 types = Tuple(fieldtype($T, i) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 jsontypes = Tuple(get(get(fieldformats, fieldname($T, i), NamedTuple()), :jsontype, fieldtype($T, i)) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
-                return JSON2.generate_missing_read_body(names, types, jsontypes, defaults)
+                return JSON2.generate_missing_read_body(names, types, jsontypes, defaults, opts)
             end
             $wr
         end)
         # @show q
     else
         q = esc(quote
-            @generated function JSON2.read(io::IO, T::Type{$T})
+            @generated function JSON2.read(io::IO, T::Type{$T}, opts::JSON2.Opts=JSON2.defaultopts($T))
                 fieldformats = Dict($(args...))
                 types = Tuple(fieldtype($T, i) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 jsontypes = Tuple(get(get(fieldformats, fieldname($T, i), NamedTuple()), :jsontype, fieldtype($T, i)) for i = 1:fieldcount($T) if !get(get(fieldformats, fieldname($T, i), NamedTuple()), :exclude, false))
                 N = length(types)
-                return JSON2.generate_default_read_body(N, types, jsontypes, $T <: NamedTuple)
+                return JSON2.generate_default_read_body(N, types, jsontypes, $T <: NamedTuple, opts)
             end
             $wr
         end)
