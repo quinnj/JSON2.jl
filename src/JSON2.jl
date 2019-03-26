@@ -128,7 +128,9 @@ macro format(T, typetype, exprs...)
         v = ex.args[2]
         :($k => $v)
     end
-    kw = :(JSON2.defaultkwargs(::Type{$T}) = Dict{Symbol, Any}($(kwargs...)))
+    kw = if !isempty(kwargs)
+        :(JSON2.defaultkwargs(::Type{$T}) = Dict{Symbol, Any}($(kwargs...)))
+    end
 
     args = filter(x->typeof(x) != LineNumberNode, expr.args)
     foreach(x->x.args[2] = QuoteNode(x.args[2]), args)
