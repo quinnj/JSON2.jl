@@ -11,7 +11,7 @@ getconvert(::Type{T}) where {T <: Number} = x -> number(T, x)
 getconvert(T) = x -> convert(T, x)
 
 const BUF = IOBuffer()
-write(obj, args...; kwargs...) = (write(BUF, obj, args...; kwargs...); return String(take!(BUF)))
+write(obj; kwargs...) = (write(BUF, obj; kwargs...); return String(take!(BUF)))
 
 function write(io::IO, obj::Dict{K, V}; kwargs...) where {K, V}
     Base.write(io, '{')

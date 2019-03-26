@@ -33,7 +33,7 @@ end
 
 invalid(T, b) = ArgumentError("invalid JSON detected parsing type '$T': encountered '$(Char(b))'")
 
-read(str::AbstractString, T=Any,  args...; kwargs...) = read(IOBuffer(str), T, args...; kwargs...)
+read(str::AbstractString, T=Any; kwargs...) = read(IOBuffer(str), T; kwargs...)
 
 # read generic JSON: detect null, Bool, Int, Float, String, Array, Dict/Object into a NamedTuple
 function read(io::IO, ::Type{Any}=Any; kwargs...)
