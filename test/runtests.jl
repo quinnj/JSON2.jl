@@ -88,8 +88,8 @@ end
 @test JSON2.write(Date(2017, 1, 1)) == "\"2017-01-01\""
 @test JSON2.read(JSON2.write(Date(2017, 1, 1)), Date) == Date(2017, 1, 1)
 df = dateformat"mm/dd/yyyy"
-@test JSON2.write(Date(2017, 1, 1), df) == "\"01/01/2017\""
-@test JSON2.read(JSON2.write(Date(2017, 1, 1), df), Date, df) == Date(2017, 1, 1)
+@test JSON2.write(Date(2017, 1, 1); dateformat=df) == "\"01/01/2017\""
+@test JSON2.read(JSON2.write(Date(2017, 1, 1); dateformat=df), Date; dateformat=df) == Date(2017, 1, 1)
 
 @test JSON2.write(nothing) == "null"
 @test JSON2.read(JSON2.write(nothing), Nothing) === nothing

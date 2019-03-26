@@ -33,34 +33,34 @@ end
 
 invalid(T, b) = ArgumentError("invalid JSON detected parsing type '$T': encountered '$(Char(b))'")
 
-read(str::AbstractString, T=Any, opts::Opts=defaultopts(T), args...) = read(IOBuffer(str), T, opts, args...)
+read(str::AbstractString, T=Any,  args...; kwargs...) = read(IOBuffer(str), T, args...; kwargs...)
 
 # read generic JSON: detect null, Bool, Int, Float, String, Array, Dict/Object into a NamedTuple
-function read(io::IO, ::Type{Any}=Any, opts::Opts=Opts())
+function read(io::IO, ::Type{Any}=Any; kwargs...)
     eof(io) && return NamedTuple()
     wh!(io)
     b = peekbyte(io)
     if b == UInt('{')
         # object
-        return read(io, NamedTuple, opts)
+        return read(io, NamedTuple; kwargs...)
     elseif b == UInt('[')
         # array
         # TODO: we could try and be fancy here and parse a more specific vector
-        return read(io, Vector{Any}, opts)
+        return read(io, Vector{Any}; kwargs...)
     elseif (NEG_ONE < b < TEN) || (b == MINUS || b == PLUS)
         # int or float
-        fl = read(io, Float64, opts)
+        fl = read(io, Float64; kwargs...)
         int = unsafe_trunc(Int, fl)
         return ifelse(int == fl, int, fl)
     elseif b == UInt8('"')
         # string)
-        return read(io, String, opts)
+        return read(io, String; kwargs...)
     elseif b == UInt8('n')
         # null
-        return read(io, Nothing, opts)
+        return read(io, Nothing; kwargs...)
     elseif b == UInt8('t')
         # true
-        return read(io, Bool, opts)
+        return read(io, Bool; kwargs...)
     elseif b == UInt8('f')
         # false or function literal
         pos = position(io)
@@ -68,44 +68,44 @@ function read(io::IO, ::Type{Any}=Any, opts::Opts=Opts())
         eof(io) && throw(ArgumentError("early EOF"))
         func = peekbyte(io) == UInt8('u')
         seek(io, pos)
-        return func ? read(io, Function, opts) : read(io, Bool, opts)
+        return func ? read(io, Function; kwargs...) : read(io, Bool; kwargs...)
     else
         throw(ArgumentError("error detecting type of JSON object to parse: invalid JSON detected"))
     end
 end
 
 nonNothingT(::Type{Union{Nothing, T}}) where {T} = T
-function read(io::IO, U::Union, opts::Opts=Opts())
+function read(io::IO, U::Union; kwargs...)
     if U.a === Nothing || U.b === Nothing
         b = peekbyte(io)
         if b == LITTLE_N
-            return read(io, Nothing, opts)
+            return read(io, Nothing; kwargs...)
         else
-            return read(io, nonNothingT(U), opts)
+            return read(io, nonNothingT(U); kwargs...)
         end
     else
         pos = position(io)
         try
-            return read(io, U.a, opts)
+            return read(io, U.a; kwargs...)
         catch
             seek(io, pos)
-            return read(io, U.b, opts)
+            return read(io, U.b; kwargs...)
         end
     end
 end
 
-function read(io::IO, T::Type{NamedTuple}, opts::Opts=Opts())
+function read(io::IO, T::Type{NamedTuple}; kwargs...)
     @expect '{'
     wh!(io)
     keys = Symbol[]
     vals = Any[]
     peekbyte(io) == CLOSE_CURLY_BRACE && (readbyte(io); @goto done)
     while true
-        push!(keys, read(io, Symbol, opts))
+        push!(keys, read(io, Symbol; kwargs...))
         wh!(io)
         @expect ':'
         wh!(io)
-        push!(vals, read(io, Any, opts)) # recursively reads value
+        push!(vals, read(io, Any; kwargs...)) # recursively reads value
         wh!(io)
         @expectoneof ',' '}'
         b == CLOSE_CURLY_BRACE && @goto done
@@ -115,7 +115,7 @@ function read(io::IO, T::Type{NamedTuple}, opts::Opts=Opts())
     return NamedTuple{Tuple(keys)}(Tuple(vals))
 end
 
-function read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: NamedTuple{names, types}} where {names, types}
+function read(io::IO, ::Type{T}; kwargs...) where {T <: NamedTuple{names, types}} where {names, types}
     @expect '{'
     wh!(io)
     keys = Symbol[]
@@ -123,12 +123,12 @@ function read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: NamedTuple{names
     peekbyte(io) == CLOSE_CURLY_BRACE && (readbyte(io); @goto done)
     typemap = Dict(k=>v for (k, v) in zip(names, types.parameters))
     while true
-        key = read(io, Symbol, opts)
+        key = read(io, Symbol; kwargs...)
         push!(keys, key)
         wh!(io)
         @expect ':'
         wh!(io)
-        push!(vals, read(io, typemap[key], opts)) # recursively reads value
+        push!(vals, read(io, typemap[key]; kwargs...)) # recursively reads value
         wh!(io)
         @expectoneof ',' '}'
         b == CLOSE_CURLY_BRACE && @goto done
@@ -138,18 +138,18 @@ function read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: NamedTuple{names
     return NamedTuple{names}(NamedTuple{Tuple(keys)}(Tuple(vals)))
 end
 
-read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: AbstractDict} = read(io, T(), opts)
-function read(io::IO, dict::Dict{K,V}, opts::Opts=Opts()) where {K, V}
+read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractDict} = read(io, T(); kwargs...)
+function read(io::IO, dict::Dict{K,V}; kwargs...) where {K, V}
     T = typeof(dict)
     @expect '{'
     wh!(io)
     peekbyte(io) == CLOSE_CURLY_BRACE && (readbyte(io); @goto done)
     while true
-        key = read(io, K, opts)
+        key = read(io, K; kwargs...)
         wh!(io)
         @expect ':'
         wh!(io)
-        dict[key] = read(io, V, opts) # recursively reads one element
+        dict[key] = read(io, V; kwargs...) # recursively reads one element
         wh!(io)
         @expectoneof ',' '}'
         b == CLOSE_CURLY_BRACE && @goto done
@@ -159,17 +159,17 @@ function read(io::IO, dict::Dict{K,V}, opts::Opts=Opts()) where {K, V}
     return dict
 end
 
-read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: Tuple} = Tuple(read(io, Array, opts))
-read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: AbstractSet} = T(read(io, Array, opts))
-read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: AbstractArray} = read(io, T([]), opts)
+read(io::IO, ::Type{T}; kwargs...) where {T <: Tuple} = Tuple(read(io, Array; kwargs...))
+read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractSet} = T(read(io, Array; kwargs...))
+read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractArray} = read(io, T([]); kwargs...)
 
-function read(io::IO, A::AbstractArray{eT}, opts::Opts=Opts()) where {eT}
+function read(io::IO, A::AbstractArray{eT}; kwargs...) where {eT}
     T = typeof(A)
     @expect '['
     wh!(io)
     peekbyte(io) == CLOSE_SQUARE_BRACE && (readbyte(io); @goto done)
     while true
-        push!(A, read(io, eT, opts)) # recursively reads one element
+        push!(A, read(io, eT; kwargs...)) # recursively reads one element
         wh!(io)
         @expectoneof ',' ']'
         b == CLOSE_SQUARE_BRACE && @goto done
@@ -179,7 +179,7 @@ function read(io::IO, A::AbstractArray{eT}, opts::Opts=Opts()) where {eT}
     return A
 end
 
-function read(io::IO, ::Type{Function}, ::Opts=Opts())
+function read(io::IO, ::Type{Function}; kwargs...)
     buf = IOBuffer()
     wh!(io)
     while !eof(io)
@@ -197,30 +197,30 @@ function read(io::IO, ::Type{Function}, ::Opts=Opts())
 end
 
 # read Number, String, Nullable, Bool
-read(io::IO, ::Type{T}, ::Opts=Opts()) where {T <: Integer} = Parsers.parse(io, T)
-read(io::IO, ::Type{T}, ::Opts=Opts()) where {T <: AbstractFloat} = Parsers.parse(io, T)
+read(io::IO, ::Type{T}; kwargs...) where {T <: Integer} = Parsers.parse(io, T)
+read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractFloat} = Parsers.parse(io, T)
 
-function read(io::IO, T::Type{Char}, ::Opts=Opts())
+function read(io::IO, T::Type{Char}; kwargs...)
     @expect '"'
     c = Char(readbyte(io))
     @expect '"'
     return c
 end
-read(io::IO, ::Type{Date}, opts::Opts=Opts()) = Date(read(io, String, opts), opts.date)
-read(io::IO, ::Type{DateTime}, opts::Opts=Opts()) = DateTime(read(io, String, opts), opts.datetime)
-read(io::IO, ::Type{T}, opts::Opts=Opts()) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol, opts))
+read(io::IO, ::Type{Date}; kwargs...) = Date(read(io, String; kwargs...), get(kwargs, :dateformat, ISODateFormat))
+read(io::IO, ::Type{DateTime}; kwargs...) = DateTime(read(io, String; kwargs...), get(kwargs, :datetimeformat, ISODateTimeFormat))
+read(io::IO, ::Type{T}; kwargs...) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol; kwargs...))
 
-function read(io::IO, T::Type{Nothing}, ::Opts=Opts())
+function read(io::IO, T::Type{Nothing}; kwargs...)
     @expect 'n' 'u' 'l' 'l'
     return nothing
 end
 
-function read(io::IO, T::Type{Missing}, ::Opts=Opts())
+function read(io::IO, T::Type{Missing}; kwargs...)
     @expect 'n' 'u' 'l' 'l'
     return missing
 end
 
-function read(io::IO, T::Type{Bool}, ::Opts=Opts())
+function read(io::IO, T::Type{Bool}; kwargs...)
     b = peekbyte(io)
     if b == UInt8('t')
         @expect 't' 'r' 'u' 'e'
@@ -231,7 +231,7 @@ function read(io::IO, T::Type{Bool}, ::Opts=Opts())
     end
 end
 
-function generate_default_read_body(N, types, jsontypes, isnamedtuple, opts)
+function generate_default_read_body(N, types, jsontypes, isnamedtuple)
     inner = Expr(:block)
     keys = ((((Symbol("key_$j") for j = 1:i)...,) for i = 1:N)...,)
     vals = ((((Symbol("val_$j") for j = 1:i)...,) for i = 1:N)...,)
@@ -242,11 +242,11 @@ function generate_default_read_body(N, types, jsontypes, isnamedtuple, opts)
             ret = :(T($((vals[i])...)))
         end
         push!(inner.args, quote
-            $(keys[i][i]) = JSON2.read(io, String, opts)
+            $(keys[i][i]) = JSON2.read(io, String; kwargs...)
             JSON2.wh!(io)
             JSON2.@expect ':'
             JSON2.wh!(io)
-            $(vals[i][i]) = $(JSON2.getconvert(types[i]))(JSON2.read(io, $(jsontypes[i]), opts))
+            $(vals[i][i]) = $(JSON2.getconvert(types[i]))(JSON2.read(io, $(jsontypes[i]); kwargs...))
             JSON2.wh!(io)
             JSON2.@expectoneof ',' '}'
             b == JSON2.CLOSE_CURLY_BRACE && return $ret
@@ -282,7 +282,7 @@ end
 
 const EMPTY_SYMBOL = Symbol("")
 
-function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fulltypes, fulljsontypes, opts, args=(), argnm=EMPTY_SYMBOL, arg=nothing)
+function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fulltypes, fulljsontypes, args=(), argnm=EMPTY_SYMBOL, arg=nothing; kwargs...)
     # @show name, names, T, types, jT, jsontypes, defaults, args, argnm, arg
     # @show name == argnm
     # @show names
@@ -296,8 +296,9 @@ function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fullty
                     names[1], Base.tail(names),
                     types[1], Base.tail(types),
                     jsontypes[1], Base.tail(jsontypes),
-                    defaults, fulltypes, fulljsontypes, opts,
-                    (args..., arg), EMPTY_SYMBOL, nothing)
+                    defaults, fulltypes, fulljsontypes,
+                    (args..., arg), EMPTY_SYMBOL, nothing;
+                    kwargs...)
             end
         else
             if isempty(names)
@@ -307,8 +308,9 @@ function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fullty
                     names[1], Base.tail(names),
                     types[1], Base.tail(types),
                     jsontypes[1], Base.tail(jsontypes),
-                    defaults, fulltypes, fulljsontypes, opts,
-                    (args..., defaults[name]), argnm, arg)
+                    defaults, fulltypes, fulljsontypes,
+                    (args..., defaults[name]), argnm, arg;
+                    kwargs...)
             end
         end
     end
@@ -320,24 +322,25 @@ function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fullty
             return JSON2.read_args(io, b, names[1], Base.tail(names),
                                    types[1], Base.tail(types),
                                    jsontypes[1], Base.tail(jsontypes),
-                                   defaults, fulltypes, fulljsontypes, opts,
-                                   (args..., defaults[name]), argnm, arg)
+                                   defaults, fulltypes, fulljsontypes,
+                                   (args..., defaults[name]), argnm, arg;
+                                   kwargs...)
         end
     end
-    key = JSON2.read(io, Symbol, opts)
+    key = JSON2.read(io, Symbol; kwargs...)
     JSON2.wh!(io)
     JSON2.@expect ':'
     JSON2.wh!(io)
     if key == name
-        val = JSON2.getconvert(T)(JSON2.read(io, jT, opts))
+        val = JSON2.getconvert(T)(JSON2.read(io, jT; kwargs...))
     else
         val = defaults[name]
         if haskey(fulltypes, key)
             argnm = key
-            arg = JSON2.getconvert(fulltypes[key])(JSON2.read(io, fulljsontypes[key], opts))
+            arg = JSON2.getconvert(fulltypes[key])(JSON2.read(io, fulljsontypes[key]; kwargs...))
         else
             # ignore unknown field
-            JSON2.read(io, Any, opts)
+            JSON2.read(io, Any; kwargs...)
         end
     end
     JSON2.wh!(io)
@@ -349,12 +352,13 @@ function read_args(io, b, name, names, T, types, jT, jsontypes, defaults, fullty
             names[1], Base.tail(names),
             types[1], Base.tail(types),
             jsontypes[1], Base.tail(jsontypes),
-            defaults, fulltypes, fulljsontypes, opts,
-            (args..., val), argnm, arg)
+            defaults, fulltypes, fulljsontypes,
+            (args..., val), argnm, arg;
+            kwargs...)
     end
 end
 
-function generate_missing_read_body(names, types, jsontypes, defaults, opts)
+function generate_missing_read_body(names, types, jsontypes, defaults)
     fulltypes = NamedTuple{names}(types)
     fulljsontypes = NamedTuple{names}(jsontypes)
     body = quote
@@ -365,7 +369,7 @@ function generate_missing_read_body(names, types, jsontypes, defaults, opts)
             $(QuoteNode(names[1])), $(Base.tail(names)),
             $(types[1]), $(Base.tail(types)),
             $(jsontypes[1]), $(Base.tail(jsontypes)),
-            $defaults, $fulltypes, $fulljsontypes, $opts)
+            $defaults, $fulltypes, $fulljsontypes; kwargs...)
         b == JSON2.CLOSE_CURLY_BRACE && return T(args...)
         # in case there are extra fields, just ignore
         curlies = 1
@@ -384,7 +388,7 @@ function generate_missing_read_body(names, types, jsontypes, defaults, opts)
     return body
 end
 
-function generate_read_body_noargs(N, names, jsontypes, defaults, opts)
+function generate_read_body_noargs(N, names, jsontypes, defaults)
     body = quote
         x = T()
         eof(io) && return x
@@ -397,12 +401,12 @@ function generate_read_body_noargs(N, names, jsontypes, defaults, opts)
         seen = Set{Symbol}()
         jsontypes = $jsontypes
         while !eof(io)
-            key = JSON2.read(io, Symbol, opts)
+            key = JSON2.read(io, Symbol; kwargs...)
             key = get(names, key, key)
             JSON2.wh!(io)
             JSON2.@expect ':'
             JSON2.wh!(io)
-            val = JSON2.read(io, get(jsontypes, key, Any), opts)
+            val = JSON2.read(io, get(jsontypes, key, Any); kwargs...)
             key in allnames && Core.setfield!(x, key, val)
             push!(seen, key)
             JSON2.wh!(io)
@@ -423,8 +427,8 @@ function generate_read_body_noargs(N, names, jsontypes, defaults, opts)
     return body
 end
 
-@generated function read(io::IO, ::Type{T}, opts::Opts=defaultopts(T)) where {T}
+@generated function read(io::IO, ::Type{T}; kwargs...) where T
     N = fieldcount(T)
     types = Tuple(fieldtype(T, i) for i = 1:N)
-    return generate_default_read_body(N, types, types, T <: NamedTuple, opts)
+    return generate_default_read_body(N, types, types, T <: NamedTuple)
 end

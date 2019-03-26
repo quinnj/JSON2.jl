@@ -101,7 +101,7 @@ function needescape(str)
     return false
 end
 
-function write(io::IO, obj::AbstractString, ::Opts=Opts())
+function write(io::IO, obj::AbstractString; kwargs...)
     Base.write(io, '"')
     if needescape(obj)
         bytes = codeunits(obj)
@@ -143,7 +143,7 @@ function unescape(str)
     return String(take!(BUF))
 end
 
-function read(io::IO, T::Type{String}, ::Opts=Opts())
+function read(io::IO, T::Type{String}; kwargs...)
     @expect '"'
     b = readbyte(io)
     hasescapechars = false
@@ -162,7 +162,7 @@ function read(io::IO, T::Type{String}, ::Opts=Opts())
     return hasescapechars ? unescape(str) : str
 end
 
-function read(io::IOBuffer, T::Type{String}, ::Opts=Opts())
+function read(io::IOBuffer, T::Type{String}; kwargs...)
     @expect '"'
     ptr = pointer(io.data, io.ptr)
     b = readbyte(io)
@@ -183,7 +183,7 @@ function read(io::IOBuffer, T::Type{String}, ::Opts=Opts())
     return hasescapechars ? unescape(str) : str
 end
 
-function read(io::IOBuffer, T::Type{Symbol}, ::Opts=Opts())
+function read(io::IOBuffer, T::Type{Symbol}; kwargs...)
     @expect '"'
     ptr = pointer(io.data, io.ptr)
     b = readbyte(io)
@@ -204,4 +204,4 @@ function read(io::IOBuffer, T::Type{Symbol}, ::Opts=Opts())
     return hasescapechars ? Symbol(unescape(unsafe_string(ptr, len))) : sym
 end
 # slow path
-read(io::IO, ::Type{Symbol}, opts::Opts=Opts()) = Symbol(read(io, String, opts))
+read(io::IO, ::Type{Symbol}; kwargs...) = Symbol(read(io, String; kwargs...))
