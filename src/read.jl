@@ -206,8 +206,8 @@ function read(io::IO, T::Type{Char}; kwargs...)
     @expect '"'
     return c
 end
-read(io::IO, ::Type{Date}; kwargs...) = Date(read(io, String; kwargs...), get(kwargs, :dateformat, ISODateFormat))
-read(io::IO, ::Type{DateTime}; kwargs...) = DateTime(read(io, String; kwargs...), get(kwargs, :datetimeformat, ISODateTimeFormat))
+read(io::IO, ::Type{Date}; kwargs...) = Date(read(io, String; kwargs...), mergedefaultkwargs(Date; kwargs...)[:dateformat])
+read(io::IO, ::Type{DateTime}; kwargs...) = DateTime(read(io, String; kwargs...), mergedefaultkwargs(DateTime; kwargs...)[:datetimeformat])
 read(io::IO, ::Type{T}; kwargs...) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol; kwargs...))
 
 function read(io::IO, T::Type{Nothing}; kwargs...)
@@ -232,7 +232,7 @@ function read(io::IO, T::Type{Bool}; kwargs...)
 end
 
 function generate_default_read_body(N, types, jsontypes, isnamedtuple)
-    inner = Expr(:block)
+    inner = Expr(:block, :(kwargs = JSON2.mergedefaultkwargs(T; kwargs...)))
     keys = ((((Symbol("key_$j") for j = 1:i)...,) for i = 1:N)...,)
     vals = ((((Symbol("val_$j") for j = 1:i)...,) for i = 1:N)...,)
     foreach(1:N) do i
@@ -362,6 +362,7 @@ function generate_missing_read_body(names, types, jsontypes, defaults)
     fulltypes = NamedTuple{names}(types)
     fulljsontypes = NamedTuple{names}(jsontypes)
     body = quote
+        kwargs = JSON2.mergedefaultkwargs(T; kwargs...)
         JSON2.@expect '{'
         JSON2.wh!(io)
         JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); return T())
@@ -390,6 +391,7 @@ end
 
 function generate_read_body_noargs(N, names, jsontypes, defaults)
     body = quote
+        kwargs = JSON2.mergedefaultkwargs(T; kwargs...)
         x = T()
         eof(io) && return x
         JSON2.@expect '{' # start of object

@@ -47,8 +47,8 @@ end
 write(io::IO, obj::Function; kwargs...) = (Base.write(io, obj.str); return)
 write(io::IO, obj::Number; kwargs...) = (Base.write(io, string(obj)); return)
 write(io::IO, obj::AbstractFloat; kwargs...) = (Base.print(io, isfinite(obj) ? obj : "null"); return)
-write(io::IO, obj::Date; kwargs...) = (Base.write(io, "\"$(Dates.format(obj, get(kwargs, :dateformat, ISODateFormat)))\"")  ; return)
-write(io::IO, obj::DateTime; kwargs...) = (Base.write(io, "\"$(Dates.format(obj, get(kwargs, :datetimeformat, ISODateTimeFormat)))\"")  ; return)
+write(io::IO, obj::Date; kwargs...) = (Base.write(io, "\"$(Dates.format(obj, mergedefaultkwargs(Date; kwargs...)[:dateformat]))\"")  ; return)
+write(io::IO, obj::DateTime; kwargs...) = (Base.write(io, "\"$(Dates.format(obj, mergedefaultkwargs(DateTime; kwargs...)[:datetimeformat]))\"")  ; return)
 write(io::IO, obj::Nothing; kwargs...) = (Base.write(io, "null"); return)
 write(io::IO, obj::Missing; kwargs...) = (Base.write(io, "null"); return)
 write(io::IO, obj::Bool; kwargs...) = (Base.write(io, obj ? "true" : "false"); return)
@@ -58,7 +58,7 @@ write(io::IO, p::Pair; kwargs...) = write(io, Dict(Symbol(p.first)=>p.second); k
 # N = # of fields
 function generate_write_body(N, inds, names, omitempties, converts)
     # @show N, inds, names
-    body = Expr(:block)
+    body = Expr(:block, :(kwargs = JSON2.mergedefaultkwargs(obj; kwargs...)))
     push!(body.args, :(Base.write(io, '{')))
     push!(body.args, :(j = 1))
 
