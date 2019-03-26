@@ -169,6 +169,7 @@ macro format(T, typetype, exprs...)
                 types = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(get(fieldformats, nm, NamedTuple()), :jsontype, fieldtype($T, i))) for (i, nm) in enumerate(fieldnames($T)) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false))...)
                 defaults = (; ((get(get(fieldformats, nm, NamedTuple()), :name, nm), get(fieldformats, nm, NamedTuple())[:default]) for nm in fieldnames($T) if !get(get(fieldformats, nm, NamedTuple()), :exclude, false) && haskey(get(fieldformats, nm, NamedTuple()), :default))...)
                 q = quote
+                    kwargs = JSON2.mergedefaultkwargs(T; kwargs...)
                     JSON2.@expect '{'
                     JSON2.wh!(io)
                     keys = Symbol[]
@@ -176,12 +177,12 @@ macro format(T, typetype, exprs...)
                     JSON2.peekbyte(io) == JSON2.CLOSE_CURLY_BRACE && (JSON2.readbyte(io); @goto done)
                     typemap = $types
                     while true
-                        key = JSON2.read(io, Symbol)
+                        key = JSON2.read(io, Symbol; kwargs...)
                         push!(keys, key)
                         JSON2.wh!(io)
                         JSON2.@expect ':'
                         JSON2.wh!(io)
-                        push!(vals, JSON2.read(io, get(typemap, key, Any))) # recursively reads value
+                        push!(vals, JSON2.read(io, get(typemap, key, Any); kwargs...)) # recursively reads value
                         JSON2.wh!(io)
                         JSON2.@expectoneof ',' '}'
                         b == JSON2.CLOSE_CURLY_BRACE && @goto done
