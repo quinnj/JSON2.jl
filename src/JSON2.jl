@@ -30,8 +30,6 @@ include("pretty.jl")
 
 defaultkwargs(x::T) where T = defaultkwargs(T)
 defaultkwargs(x::Type) = Dict{Symbol, Any}()
-defaultkwargs(x::Type{Date}) = Dict{Symbol, Any}(:dateformat => ISODateFormat)
-defaultkwargs(x::Type{DateTime}) = Dict{Symbol, Any}(:datetimeformat => ISODateTimeFormat)
 mergedefaultkwargs(x; kwargs...) = merge!(defaultkwargs(x), Dict(pairs(kwargs)))
 
 ## JSON2.@format
