@@ -115,8 +115,16 @@ Again, the default case is for JSON input that will have consistently ordered, a
       During parsing, an instance of `T` will first constructed using the "noargs" constructor, then fields will be set as they're parsed from the JSON input (hence why `mutable struct` is required).
 
 """
-macro format(T, typetype, exprs...)
-    kwend, expr = if exprs[end].head === :(=)
+macro format(T, exprs...)
+    typetype = if !isempty(exprs) && exprs[1] isa Union{String, Symbol}
+        t = exprs[1]
+        exprs = exprs[2:end]
+        t
+    else
+        ""
+    end
+
+    kwend, expr = if isempty(exprs) || exprs[end].head === :(=)
         length(exprs), Expr(:block)
     else
         length(exprs) - 1, exprs[end]

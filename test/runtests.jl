@@ -1,6 +1,7 @@
 using JSON2, Parsers, Test, Dates
 include("json.jl")
 include("custom.jl")
+include("options.jl")
 
 # builtins
 # Any
