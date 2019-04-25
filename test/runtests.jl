@@ -179,3 +179,9 @@ JSON2.pretty(io, json)
 @test_throws ArgumentError JSON2.read("\"abc\"", Char)
 
 @test JSON2.read(IOBuffer("\"\\u003e\\u003d\$1B\""), String) == ">=\$1B"
+
+# Default DateTime format
+@test JSON2.read("\"2019-03-25T23:12:51.191\"", DateTime) == DateTime(2019, 3, 25, 23, 12, 51, 191)
+
+# Unions which both read strings
+@test JSON2.read("\"foo\"", Union{DateTime, String}) == "foo"
