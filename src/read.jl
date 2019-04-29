@@ -207,7 +207,7 @@ function read(io::IO, T::Type{Char}; kwargs...)
     return c
 end
 read(io::IO, ::Type{Date}; dateformat=ISODateFormat, kwargs...) = Date(read(io, String; kwargs...), dateformat)
-read(io::IO, ::Type{DateTime}; datetimeformat=ISODateTimeFormat, kwargs...) = DateTime(read(io, String; kwargs...), datetimeformat)
+read(io::IO, ::Type{DateTime}; dateformat=ISODateformat, kwargs...) = DateTime(read(io, String; kwargs...), dateformat)
 read(io::IO, ::Type{T}; kwargs...) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol; kwargs...))
 
 function read(io::IO, T::Type{Nothing}; kwargs...)
