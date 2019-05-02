@@ -1,0 +1,15 @@
+name = "JSON2"
+uuid = "2535ab7d-5cd8-5a07-80ac-9b1792aadce3"
+authors = ["Jacob Quinn <quinn.jacobd@gmail.com>"]
+version = "0.3.0"
+
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+
+[compat]
+Parsers = "≥ 0.3.1"
+julia = "≥ 1.0.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
