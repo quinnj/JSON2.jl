@@ -196,9 +196,9 @@ function read(io::IO, ::Type{Function}; kwargs...)
     return Function(String(take!(buf)))
 end
 
-# read Number, String, Nullable, Bool
-read(io::IO, ::Type{T}; kwargs...) where {T <: Integer} = Parsers.parse(io, T)
-read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractFloat} = Parsers.parse(io, T)
+# read Number, String, Bool
+read(io::IO, ::Type{T}; kwargs...) where {T <: Integer} = Parsers.parse(T, io)
+read(io::IO, ::Type{T}; kwargs...) where {T <: AbstractFloat} = Parsers.parse(T, io)
 
 function read(io::IO, T::Type{Char}; kwargs...)
     @expect '"'
@@ -206,8 +206,8 @@ function read(io::IO, T::Type{Char}; kwargs...)
     @expect '"'
     return c
 end
-read(io::IO, ::Type{Date}; dateformat=ISODateFormat, kwargs...) = Date(read(io, String; kwargs...), dateformat)
-read(io::IO, ::Type{DateTime}; dateformat=ISODateformat, kwargs...) = DateTime(read(io, String; kwargs...), dateformat)
+read(io::IO, ::Type{Date}; dateformat=Dates.ISODateFormat, kwargs...) = Date(read(io, String; kwargs...), dateformat)
+read(io::IO, ::Type{DateTime}; datetimeformat=nothing, dateformat=Dates.ISODateTimeFormat, kwargs...) = DateTime(read(io, String; kwargs...), something(datetimeformat, dateformat))
 read(io::IO, ::Type{T}; kwargs...) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol; kwargs...))
 
 function read(io::IO, T::Type{Nothing}; kwargs...)

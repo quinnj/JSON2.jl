@@ -66,15 +66,6 @@ charvalue(b) = (NEG_ONE < b < TEN)         ? b - ZERO            :
                (BIG_A <= b <= BIG_F)       ? b - (BIG_A - 0x0a)    :
                throw(ArgumentError("JSON invalid unicode hex value"))
 
-function readhexchar(io)
-    n = 0x0000
-    for _ = 1:4
-        b = readbyte(io)
-        n = (n << 4) + charvalue(b)
-    end
-    return Char(n)
-end
-
 iscntrl(c::Char) = c <= '\x1f' || '\x7f' <= c <= '\u9f'
 function escaped(b)
     if b == FORWARDSLASH
@@ -119,28 +110,59 @@ end
 # read
 const BACKSLASH = UInt8('\\')
 
-function unescape(str)
-    io = getescapebuffer(str)
-    while !eof(io)
-        b = readbyte(io)
-        if b === BACKSLASH
-            eof(io) && throw(ArgumentError("invalid escape character in JSON string"))
-            b = readbyte(io)
-            if b == LITTLE_U
-                c = readhexchar(io)
-                Base.write(BUF, c)
-            else
-                d = reverseescapechar(b)
-                d == 0x00 && throw(ArgumentError("JSON invalid escape character: '$(Char(b))'"))
-                Base.write(BUF, d)
+@noinline invalid_escape(str) = throw(ArgumentError("encountered invalid escape character in json string: \"$str\""))
+@noinline unescaped_control(b) = throw(ArgumentError("encountered unescaped control character in json: '$(Char(b))'"))
+
+function unescape(s)
+    n = ncodeunits(s)
+    buf = Base.StringVector(n)
+    len = 1
+    i = 1
+    @inbounds begin
+        while i <= n
+            b = codeunit(s, i)
+            if b == BACKSLASH
+                i += 1
+                i > n && invalid_escape(s)
+                b = codeunit(s, i)
+                if b == LITTLE_U
+                    c = 0x0000
+                    i += 1
+                    i > n && invalid_escape(s)
+                    b = codeunit(s, i)
+                    c = (c << 4) + charvalue(b)
+                    i += 1
+                    i > n && invalid_escape(s)
+                    b = codeunit(s, i)
+                    c = (c << 4) + charvalue(b)
+                    i += 1
+                    i > n && invalid_escape(s)
+                    b = codeunit(s, i)
+                    c = (c << 4) + charvalue(b)
+                    i += 1
+                    i > n && invalid_escape(s)
+                    b = codeunit(s, i)
+                    c = (c << 4) + charvalue(b)
+                    st = codeunits(string(Char(c)))
+                    for j = 1:length(st)-1
+                        @inbounds buf[len] = st[j]
+                        len += 1
+                    end
+                    b = st[end]
+                else
+                    b = reverseescapechar(b)
+                    b == 0x00 && invalid_escape(s)
+                end
+            elseif b < SPACE
+                unescaped_control(b)
             end
-            continue
-        elseif b < SPACE
-            throw(ArgumentError("JSON encountered unescaped control character: '$(Char(b))'"))
+            @inbounds buf[len] = b
+            len += 1
+            i += 1
         end
-        Base.write(BUF, b)
     end
-    return String(take!(BUF))
+    resize!(buf, len - 1)
+    return String(buf)
 end
 
 function read(io::IO, T::Type{String}; kwargs...)
