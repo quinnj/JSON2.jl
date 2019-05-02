@@ -1,11 +1,12 @@
-const dtfmt = dateformat"YYYY.mm.dd-HH.MM.SS.sss"
+const dttmfmt = dateformat"YYYY.mm.dd-HH.MM.SS.sss"
+const dtfmt = dateformat"YYYY.mm.dd"
 
 struct OptionsTest
     d::Date
     dt::DateTime
 end
 
-JSON2.@format OptionsTest dateformat=dtfmt
+JSON2.@format OptionsTest dateformat=dtfmt datetimeformat=dttmfmt
 
 @testset "Read/write options" begin
     d = Date(1, 2, 3)
@@ -19,7 +20,7 @@ JSON2.@format OptionsTest dateformat=dtfmt
         @test JSON2.read(dtstr, DateTime) == dt
 
         @test JSON2.read(repr(Dates.format(d, dtfmt)), Date; dateformat=dtfmt) == d
-        @test JSON2.read(repr(Dates.format(dt, dtfmt)), DateTime; dateformat=dtfmt) == dt
+        @test JSON2.read(repr(Dates.format(dt, dttmfmt)), DateTime; dateformat=dttmfmt) == dt
     end
 
     @testset "Write" begin
@@ -27,16 +28,16 @@ JSON2.@format OptionsTest dateformat=dtfmt
         @test JSON2.write(dt) == repr(Dates.format(dt, ISODateTimeFormat))
 
         @test JSON2.write(d; dateformat=dtfmt) == repr(Dates.format(d, dtfmt))
-        @test JSON2.write(dt; datetimeformat=dtfmt) == repr(Dates.format(dt, dtfmt))
+        @test JSON2.write(dt; dateformat=dttmfmt) == repr(Dates.format(dt, dttmfmt))
     end
 
     @testset "Structs" begin
         opts = OptionsTest(d, dt)
 
-        s = JSON2.write(opts; dateformat=dtfmt)
+        s = JSON2.write(opts; datetimeformat=dttmfmt, dateformat=dtfmt)
         @test JSON2.read(s, OptionsTest) == opts
 
-        s = JSON2.write(opts; dateformat=ISODateTimeFormat)
-        @test JSON2.read(s, OptionsTest; dateformat=ISODateTimeFormat) == opts
+        s = JSON2.write(opts; dateformat=Dates.ISODateFormat, datetimeformat=Dates.ISODateTimeFormat)
+        @test JSON2.read(s, OptionsTest; dateformat=Dates.ISODateFormat, datetimeformat=Dates.ISODateTimeFormat) == opts
     end
 end
