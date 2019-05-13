@@ -15,8 +15,8 @@ include("strings.jl")
 include("pretty.jl")
 
 defaultkwargs(x::T) where T = defaultkwargs(T)
-defaultkwargs(x::Type) = Dict{Symbol, Any}()
-mergedefaultkwargs(x; kwargs...) = merge!(defaultkwargs(x), Dict(pairs(kwargs)))
+defaultkwargs(x::Type) = NamedTuple()
+mergedefaultkwargs(x; kwargs...) = merge(defaultkwargs(x), kwargs.data)
 
 ## JSON2.@format
 function getformats(nm; kwargs...)
@@ -115,13 +115,9 @@ macro format(T, exprs...)
     else
         length(exprs) - 1, exprs[end]
     end
-    kwargs = map(exprs[1:kwend]) do ex
-        k = QuoteNode(ex.args[1])
-        v = ex.args[2]
-        :($k => $v)
-    end
+    kwargs = Expr(:tuple, exprs[1:kwend]...)
     kw = if !isempty(kwargs)
-        :(JSON2.defaultkwargs(::Type{$T}) = Dict{Symbol, Any}($(kwargs...)))
+        :(JSON2.defaultkwargs(::Type{$T}) = $kwargs)
     end
 
     args = filter(x->typeof(x) != LineNumberNode, expr.args)
