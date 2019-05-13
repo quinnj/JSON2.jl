@@ -115,8 +115,8 @@ macro format(T, exprs...)
     else
         length(exprs) - 1, exprs[end]
     end
-    kwargs = Expr(:tuple, exprs[1:kwend]...)
-    kw = if !isempty(kwargs)
+    kw = if kwend > 0
+        kwargs = Expr(:tuple, exprs[1:kwend]...)
         :(JSON2.defaultkwargs(::Type{$T}) = $kwargs)
     end
 
