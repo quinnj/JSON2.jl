@@ -207,7 +207,17 @@ function read(io::IO, T::Type{Char}; kwargs...)
     return c
 end
 read(io::IO, ::Type{Date}; dateformat=Dates.ISODateFormat, kwargs...) = Date(read(io, String; kwargs...), dateformat)
-read(io::IO, ::Type{DateTime}; datetimeformat=nothing, dateformat=Dates.ISODateTimeFormat, kwargs...) = DateTime(read(io, String; kwargs...), something(datetimeformat, dateformat))
+function read(io::IO, ::Type{DateTime}; read_datetimeformats=[], dateformat=Dates.ISODateTimeFormat, kwargs...)
+    dfs = [read_datetimeformats; dateformat]
+    s = read(io, String; kwargs...)
+    for df in dfs
+        try
+            return DateTime(s, df)
+        catch ex
+        end
+    end
+    error("Unable to parse datetime: $s")
+end
 read(io::IO, ::Type{T}; kwargs...) where {T <: Enum} = Core.eval(parentmodule(T), read(io, Symbol; kwargs...))
 
 function read(io::IO, T::Type{Nothing}; kwargs...)
