@@ -7,6 +7,7 @@
 |:---------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
 |[![][pkg-0.6-img]][pkg-0.6-url] | [![][travis-img]][travis-url] [![][codecov-img]][codecov-url] |
 
+This package is deprecated. Its successor is at [JSON3.jl](https://github.com/quinnj/JSON3.jl).
 
 ## Installation
 
