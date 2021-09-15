@@ -16,7 +16,7 @@ include("pretty.jl")
 
 defaultkwargs(x::T) where T = defaultkwargs(T)
 defaultkwargs(x::Type) = NamedTuple()
-mergedefaultkwargs(x; kwargs...) = merge(defaultkwargs(x), kwargs.data)
+mergedefaultkwargs(x; kwargs...) = merge(defaultkwargs(x), values(kwargs))
 
 ## JSON2.@format
 function getformats(nm; kwargs...)
