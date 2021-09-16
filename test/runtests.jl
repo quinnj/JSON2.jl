@@ -186,3 +186,5 @@ JSON2.pretty(io, json)
 
 # Unions which both read strings
 @test JSON2.read("\"foo\"", Union{DateTime, String}) == "foo"
+
+@test_nowarn JSON2.mergedefaultkwargs(NamedTuple)
